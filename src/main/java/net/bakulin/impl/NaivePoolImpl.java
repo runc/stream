@@ -7,28 +7,38 @@ import net.bakulin.EventConsumer;
 import net.bakulin.EventStream;
 import net.bakulin.ProjectionMetrics;
 import net.bakulin.consumer.ClientProjection;
+import net.bakulin.consumer.NaivePool;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Slf4j
-public class SequentialImpl implements EventStream {
+public class NaivePoolImpl implements EventStream {
     private static final Random RANDOM = new Random();
+
+    /**
+     * According requirements system should handle 1000 events per second.
+     * For a single event system should waste about 10ms.
+     * So single thread could process no more than 100 events per send.
+     * For handle whole load in a second we need at least 10 threads in success way.
+     */
+    private static final int NUM_THREADS = 10;
 
     public static void main(String[] args) {
 
-        ProjectionMetrics projectionMetrics = new ProjectionMetrics(new MetricRegistry());
+        MetricRegistry metricRegistry = new MetricRegistry();
+
+        ProjectionMetrics projectionMetrics = new ProjectionMetrics(metricRegistry);
 
         ClientProjection clientProjection = new ClientProjection(projectionMetrics);
 
-        SequentialImpl es = new SequentialImpl();
+        NaivePool concurrentProcessor = new NaivePool(NUM_THREADS, clientProjection, metricRegistry);
 
-        es.consume(clientProjection);
+        NaivePoolImpl es = new NaivePoolImpl();
+        es.consume(concurrentProcessor);
     }
 
     @Override
